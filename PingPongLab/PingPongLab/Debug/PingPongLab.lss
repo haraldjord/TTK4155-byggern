@@ -3,29 +3,29 @@ PingPongLab.elf:     file format elf32-avr
 
 Sections:
 Idx Name          Size      VMA       LMA       File off  Algn
-  0 .data         00000000  00800100  00800100  00000110  2**0
+  0 .data         00000000  00800100  00800100  00000140  2**0
                   CONTENTS, ALLOC, LOAD, DATA
-  1 .text         000000bc  00000000  00000000  00000054  2**1
+  1 .text         000000ec  00000000  00000000  00000054  2**1
                   CONTENTS, ALLOC, LOAD, READONLY, CODE
-  2 .comment      00000030  00000000  00000000  00000110  2**0
+  2 .comment      00000030  00000000  00000000  00000140  2**0
                   CONTENTS, READONLY
-  3 .note.gnu.avr.deviceinfo 0000003c  00000000  00000000  00000140  2**2
+  3 .note.gnu.avr.deviceinfo 0000003c  00000000  00000000  00000170  2**2
                   CONTENTS, READONLY
-  4 .debug_aranges 00000020  00000000  00000000  0000017c  2**0
+  4 .debug_aranges 00000038  00000000  00000000  000001ac  2**0
                   CONTENTS, READONLY, DEBUGGING
-  5 .debug_info   00000714  00000000  00000000  0000019c  2**0
+  5 .debug_info   000007ed  00000000  00000000  000001e4  2**0
                   CONTENTS, READONLY, DEBUGGING
-  6 .debug_abbrev 00000668  00000000  00000000  000008b0  2**0
+  6 .debug_abbrev 000006ff  00000000  00000000  000009d1  2**0
                   CONTENTS, READONLY, DEBUGGING
-  7 .debug_line   00000278  00000000  00000000  00000f18  2**0
+  7 .debug_line   00000306  00000000  00000000  000010d0  2**0
                   CONTENTS, READONLY, DEBUGGING
-  8 .debug_frame  00000024  00000000  00000000  00001190  2**2
+  8 .debug_frame  00000054  00000000  00000000  000013d8  2**2
                   CONTENTS, READONLY, DEBUGGING
-  9 .debug_str    0000037f  00000000  00000000  000011b4  2**0
+  9 .debug_str    000003b9  00000000  00000000  0000142c  2**0
                   CONTENTS, READONLY, DEBUGGING
- 10 .debug_loc    00000048  00000000  00000000  00001533  2**0
+ 10 .debug_loc    0000008c  00000000  00000000  000017e5  2**0
                   CONTENTS, READONLY, DEBUGGING
- 11 .debug_ranges 00000010  00000000  00000000  0000157b  2**0
+ 11 .debug_ranges 00000028  00000000  00000000  00001871  2**0
                   CONTENTS, READONLY, DEBUGGING
 
 Disassembly of section .text:
@@ -67,58 +67,110 @@ Disassembly of section .text:
   76:	d4 e0       	ldi	r29, 0x04	; 4
   78:	de bf       	out	0x3e, r29	; 62
   7a:	cd bf       	out	0x3d, r28	; 61
-  7c:	0e 94 44 00 	call	0x88	; 0x88 <main>
-  80:	0c 94 5c 00 	jmp	0xb8	; 0xb8 <_exit>
+  7c:	0e 94 50 00 	call	0xa0	; 0xa0 <main>
+  80:	0c 94 74 00 	jmp	0xe8	; 0xe8 <_exit>
 
 00000084 <__bad_interrupt>:
   84:	0c 94 00 00 	jmp	0	; 0x0 <__vectors>
 
-00000088 <main>:
+00000088 <USART_Init>:
+}
+
+void USART_Init(unsigned int ubrr)
+{
+	// Writes baud rate to USART Baud Rate Register H/L for port 0
+	UBRR0H = ((unsigned char)(ubrr>>8)) & 0b00001111;
+  88:	9f 70       	andi	r25, 0x0F	; 15
+  8a:	90 bd       	out	0x20, r25	; 32
+	UBRR0L = (unsigned char)ubrr;
+  8c:	89 b9       	out	0x09, r24	; 9
+	// Enables RX and TX in USART Control and Status Register B for port 0
+	UCSR0B = (1<<RXEN0)|(1<<TXEN0);
+  8e:	88 e1       	ldi	r24, 0x18	; 24
+  90:	8a b9       	out	0x0a, r24	; 10
+	// Asynchronous operation, 2 stop bits, 8 data bits, even parity (2<<UPM00)
+	UCSR0C = (1<<URSEL0)|(1<<USBS0)|(3<<UCSZ00)|(2<<UPM00);
+  92:	8e ea       	ldi	r24, 0xAE	; 174
+  94:	80 bd       	out	0x20, r24	; 32
+  96:	08 95       	ret
+
+00000098 <USART_Transmit>:
+}
+
+void USART_Transmit(unsigned char data)
+{
+	// While register is not empty, do nothing
+	while( !(UCSR0A & (1<<UDRE0)) );
+  98:	5d 9b       	sbis	0x0b, 5	; 11
+  9a:	fe cf       	rjmp	.-4      	; 0x98 <USART_Transmit>
+	
+	// Write data to USART Data Register for port 0
+	UDR0 = data;
+  9c:	8c b9       	out	0x0c, r24	; 12
+  9e:	08 95       	ret
+
+000000a0 <main>:
+
 
 int main(void)
 {
-	
 	// Sets PA0 as output and PA1 as input
 	DDRA = 255;
-  88:	8f ef       	ldi	r24, 0xFF	; 255
-  8a:	8a bb       	out	0x1a, r24	; 26
+  a0:	8f ef       	ldi	r24, 0xFF	; 255
+  a2:	8a bb       	out	0x1a, r24	; 26
+	USART_Init(MYUBRR);
+  a4:	6f e1       	ldi	r22, 0x1F	; 31
+  a6:	70 e0       	ldi	r23, 0x00	; 0
+  a8:	80 e0       	ldi	r24, 0x00	; 0
+  aa:	90 e0       	ldi	r25, 0x00	; 0
+  ac:	0e 94 44 00 	call	0x88	; 0x88 <USART_Init>
+	
+	unsigned char counter = 0;
+  b0:	c0 e0       	ldi	r28, 0x00	; 0
 	
     while (1) 
     {
+		USART_Transmit(counter);
+  b2:	8c 2f       	mov	r24, r28
+  b4:	90 e0       	ldi	r25, 0x00	; 0
+  b6:	0e 94 4c 00 	call	0x98	; 0x98 <USART_Transmit>
+		counter++;
+  ba:	cf 5f       	subi	r28, 0xFF	; 255
+		
 		PORTA = 0;
-  8c:	1b ba       	out	0x1b, r1	; 27
+  bc:	1b ba       	out	0x1b, r1	; 27
 	#else
 		//round up by default
 		__ticks_dc = (uint32_t)(ceil(fabs(__tmp)));
 	#endif
 
 	__builtin_avr_delay_cycles(__ticks_dc);
-  8e:	2f e1       	ldi	r18, 0x1F	; 31
-  90:	81 ea       	ldi	r24, 0xA1	; 161
-  92:	97 e0       	ldi	r25, 0x07	; 7
-  94:	21 50       	subi	r18, 0x01	; 1
-  96:	80 40       	sbci	r24, 0x00	; 0
-  98:	90 40       	sbci	r25, 0x00	; 0
-  9a:	e1 f7       	brne	.-8      	; 0x94 <main+0xc>
-  9c:	00 c0       	rjmp	.+0      	; 0x9e <main+0x16>
-  9e:	00 00       	nop
+  be:	2f ef       	ldi	r18, 0xFF	; 255
+  c0:	8f e7       	ldi	r24, 0x7F	; 127
+  c2:	97 e0       	ldi	r25, 0x07	; 7
+  c4:	21 50       	subi	r18, 0x01	; 1
+  c6:	80 40       	sbci	r24, 0x00	; 0
+  c8:	90 40       	sbci	r25, 0x00	; 0
+  ca:	e1 f7       	brne	.-8      	; 0xc4 <main+0x24>
+  cc:	00 c0       	rjmp	.+0      	; 0xce <main+0x2e>
+  ce:	00 00       	nop
 		_delay_ms(500);
 		PORTA = 255;
-  a0:	8f ef       	ldi	r24, 0xFF	; 255
-  a2:	8b bb       	out	0x1b, r24	; 27
-  a4:	2f e1       	ldi	r18, 0x1F	; 31
-  a6:	81 ea       	ldi	r24, 0xA1	; 161
-  a8:	97 e0       	ldi	r25, 0x07	; 7
-  aa:	21 50       	subi	r18, 0x01	; 1
-  ac:	80 40       	sbci	r24, 0x00	; 0
-  ae:	90 40       	sbci	r25, 0x00	; 0
-  b0:	e1 f7       	brne	.-8      	; 0xaa <main+0x22>
-  b2:	00 c0       	rjmp	.+0      	; 0xb4 <main+0x2c>
-  b4:	00 00       	nop
-  b6:	ea cf       	rjmp	.-44     	; 0x8c <main+0x4>
+  d0:	8f ef       	ldi	r24, 0xFF	; 255
+  d2:	8b bb       	out	0x1b, r24	; 27
+  d4:	2f ef       	ldi	r18, 0xFF	; 255
+  d6:	8f e7       	ldi	r24, 0x7F	; 127
+  d8:	97 e0       	ldi	r25, 0x07	; 7
+  da:	21 50       	subi	r18, 0x01	; 1
+  dc:	80 40       	sbci	r24, 0x00	; 0
+  de:	90 40       	sbci	r25, 0x00	; 0
+  e0:	e1 f7       	brne	.-8      	; 0xda <main+0x3a>
+  e2:	00 c0       	rjmp	.+0      	; 0xe4 <main+0x44>
+  e4:	00 00       	nop
+  e6:	e5 cf       	rjmp	.-54     	; 0xb2 <main+0x12>
 
-000000b8 <_exit>:
-  b8:	f8 94       	cli
+000000e8 <_exit>:
+  e8:	f8 94       	cli
 
-000000ba <__stop_program>:
-  ba:	ff cf       	rjmp	.-2      	; 0xba <__stop_program>
+000000ea <__stop_program>:
+  ea:	ff cf       	rjmp	.-2      	; 0xea <__stop_program>
