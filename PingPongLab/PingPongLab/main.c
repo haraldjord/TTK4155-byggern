@@ -19,6 +19,8 @@ void SRAM_test(void);
 void USART_Init(unsigned int ubrr);
 void USART_Transmit(unsigned char data);
 unsigned char USART_Receive(void);
+void CLK_Init(int TOP);
+void SRAM_Init(void);
 
 
 static FILE uart_stdio = FDEV_SETUP_STREAM(
@@ -29,32 +31,59 @@ static FILE uart_stdio = FDEV_SETUP_STREAM(
 
 int main(void)
 {
-	// Sets PA0 as output and PA1 as input
-	USART_Init(MYUBRR);
 	DDRA = 0xFF;
 	DDRE |= 0x02;
 	
-	// Enable external memory interface
-	MCUCR |= (1 << SRE);
-	// Mask PC7-PC4
-	SFIOR |= (1 << XMM2);
+	DDRD &= 0b11110011;
 	
-	//USART_Receive();
+	USART_Init(MYUBRR);
+	CLK_Init(0);
+	SRAM_Init();
+	
+	// Setup for printf
 	stdout = &uart_stdio;
 	stdin = &uart_stdio;
 	
-	unsigned char received_char;
-	//unsigned char rceived_char_old;
+	unsigned char received_char = 0;
 	
-    while (1)  {
+    while (1) {
+				
+		//received_char = USART_Receive();
 
-		received_char = USART_Receive();
-		// printf("%c", received_char);
-
-		if (received_char == 's') SRAM_test();
+		if (received_char == 's') 
+			SRAM_test();
+			
+		volatile char *adc_address = 0x1400;
+		adc_address[0] = 0b00010000; // CH0, INH = 1, POT_X
+		adc_address[0] = 0b00010010; // CH1, INH = 1, POT_Y
+		adc_address[0] = 0b00010001; // CH0, INH = 1, SLIDER_L
+		adc_address[0] = 0b00000011; // CH1, INH = 0, SLIDER_R
+		_delay_ms(1); // wait for t_conv < 50us
+		// Sequentially read channel 0-3
+		volatile char analog0 = adc_address[0];
+		volatile char analog1 = adc_address[0];
+		volatile char analog2 = adc_address[0];
+		volatile char analog3 = adc_address[0];
+			
+		char button_left = !!(PIND & (1 << PIND3));
+		char button_right = !!(PIND & (1 << PIND2));
+			
+		if (received_char == 'a') {
+			printf("%u, %u, %u, %u\n", analog0, analog1, analog2, analog3);
+			printf("Left: %u     Right: %u\n", button_left, button_right);
+		}
+		
+		char x_pos = (char)(0.784f*(float)analog0 - 100.0);
+		char y_pos = (char)(0.784f*(float)analog1 - 100.0);
+		
+		printf("%d %d\n", x_pos, y_pos);
 		
 	}
 }
+
+
+
+
 
 
 
@@ -139,4 +168,28 @@ void SRAM_test(void)
 		}
 	}
 	printf("SRAM test completed with \n%4d errors in write phase and \n%4d errors in retrieval phase\n\n", write_errors, retrieval_errors);
+}
+
+void SRAM_Init(void) {
+	// Enable external memory interface
+	MCUCR |= (1 << SRE);
+	// Mask PC7-PC4
+	SFIOR |= (1 << XMM2);
+}
+
+void CLK_Init(int TOP) {
+	// Set PD5 as output
+	DDRD |= (1 << DDD4);
+	
+	// Compare output mode: Toggle compare match
+	TCCR3A |= (1 << COM3A0); 
+	
+	// Mode 4, CTC
+	TCCR3B |= (1 << WGM32);
+	
+	// Set counter TOP value
+	OCR3A = TOP;
+	
+	// Prescaler 1
+	TCCR3B |= (1 << CS30);
 }
