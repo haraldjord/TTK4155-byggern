@@ -29,12 +29,21 @@ static FILE uart_stdio = FDEV_SETUP_STREAM(
 	_FDEV_SETUP_RW
 );
 
+volatile char analog0 = 0;
+volatile char analog1 = 0;
+volatile char analog2 = 0;
+volatile char analog3 = 0;
+int offset_x = 0;
+int offset_y = 0;
+
+
 int main(void)
 {
 	DDRA = 0xFF;
 	DDRE |= 0x02;
 	
-	DDRD &= 0b11110011;
+	// Joystick button inputs
+	DDRD &= !( (1 << PD2) | (1 << PD3) );
 	
 	USART_Init(MYUBRR);
 	CLK_Init(0);
@@ -48,45 +57,69 @@ int main(void)
 	
     while (1) {
 				
-		//received_char = USART_Receive();
-
+		received_char = USART_Receive();
+		char button_left = !!(PIND & (1 << PIND3));
+		char button_right = !!(PIND & (1 << PIND2));
+		
+		
 		if (received_char == 's') 
 			SRAM_test();
 			
-		volatile char *adc_address = 0x1400;
-		adc_address[0] = 0b00010000; // CH0, INH = 1, POT_X
-		adc_address[0] = 0b00010010; // CH1, INH = 1, POT_Y
-		adc_address[0] = 0b00010001; // CH0, INH = 1, SLIDER_L
-		adc_address[0] = 0b00000011; // CH1, INH = 0, SLIDER_R
-		_delay_ms(1); // wait for t_conv < 50us
-		// Sequentially read channel 0-3
-		volatile char analog0 = adc_address[0];
-		volatile char analog1 = adc_address[0];
-		volatile char analog2 = adc_address[0];
-		volatile char analog3 = adc_address[0];
+		else if (received_char == 'a') {
+			Read_ADC();
 			
-		char button_left = !!(PIND & (1 << PIND3));
-		char button_right = !!(PIND & (1 << PIND2));
+			int x_pos = (100*(analog0 - 128))/128 - offset_x;
+			int y_pos = (100*(analog1 - 128))/128 - offset_y;
 			
-		if (received_char == 'a') {
-			printf("%u, %u, %u, %u\n", analog0, analog1, analog2, analog3);
+			if (x_pos < -100) x_pos = -100;
+			else if (x_pos > 100) x_pos = 100;
+			if (y_pos < -100) y_pos = -100;
+			else if (y_pos > 100) y_pos = 100;
+					
+			printf("%d, %d, %d, %d\n", x_pos, y_pos, analog2, analog3);
 			printf("Left: %u     Right: %u\n", button_left, button_right);
 		}
 		
-		char x_pos = (char)(0.784f*(float)analog0 - 100.0);
-		char y_pos = (char)(0.784f*(float)analog1 - 100.0);
-		
-		printf("%d %d\n", x_pos, y_pos);
-		
+		else if (received_char == 'c') {
+			int x_pos = (100*analog0 - 12800)/128;
+			int y_pos = (100*analog1 - 12800)/128;
+			
+			Calibrate_Joystick();
+		}	
+
 	}
 }
 
 
 
 
+void Calibrate_Joystick(void) {
+	offset_x = 0;
+	offset_y = 0;
+	for (int i = 0; i < 50; i++) {
+		Read_ADC();
+		int x_pos = (100*analog0 - 12800)/128;
+		int y_pos = (100*analog1 - 12800)/128;
+		offset_x += x_pos;
+		offset_y += y_pos;
+	}
+	offset_x /= 50;
+	offset_y /= 50;
+} 
 
-
-
+void Read_ADC(void) {
+	volatile char *adc_address = 0x1400;
+	adc_address[0] = 0b00010000; // CH0, INH = 1, POT_X
+	adc_address[0] = 0b00010010; // CH1, INH = 1, POT_Y
+	adc_address[0] = 0b00010001; // CH0, INH = 1, SLIDER_L
+	adc_address[0] = 0b00000011; // CH1, INH = 0, SLIDER_R
+	_delay_ms(1); // wait for t_conv < 50us
+	// Sequentially read channel 0-3
+	analog0 = adc_address[0];
+	analog1 = adc_address[0];
+	analog2 = adc_address[0];
+	analog3 = adc_address[0];
+}
 
 void USART_Init(unsigned int ubrr) {
 	// Writes baud rate to USART Baud Rate Register H/L for port 0
@@ -96,7 +129,6 @@ void USART_Init(unsigned int ubrr) {
 	UCSR0B = (1<<RXEN0)|(1<<TXEN0);
 	// Asynchronous operation, 2 stop bits, 8 data bits, even parity (2<<UPM00) for port 0
 	UCSR0C = (1<<URSEL0)|(1<<USBS0)|(3<<UCSZ00)|(2<<UPM00);
-	
 }
 
 void USART_Transmit(unsigned char data) {
@@ -193,3 +225,4 @@ void CLK_Init(int TOP) {
 	// Prescaler 1
 	TCCR3B |= (1 << CS30);
 }
+
