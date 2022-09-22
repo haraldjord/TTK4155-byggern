@@ -21,6 +21,8 @@ void USART_Transmit(unsigned char data);
 unsigned char USART_Receive(void);
 void CLK_Init(int TOP);
 void SRAM_Init(void);
+void OLED_Init(void);
+void Write_OLED(char msg, char cd);
 
 
 static FILE uart_stdio = FDEV_SETUP_STREAM(
@@ -40,14 +42,17 @@ int offset_y = 0;
 int main(void)
 {
 	DDRA = 0xFF;
-	DDRE |= 0x02;
+	DDRE |= (0x02);
 	
 	// Joystick button inputs
 	DDRD &= !( (1 << PD2) | (1 << PD3) );
+	// Data/!Command output
+	DDRE |= (1 << PE2);
 	
 	USART_Init(MYUBRR);
 	CLK_Init(0);
 	SRAM_Init();
+	OLED_Init();
 	
 	// Setup for printf
 	stdout = &uart_stdio;
@@ -62,9 +67,9 @@ int main(void)
 		char button_right = !!(PIND & (1 << PIND2));
 		
 		
-		if (received_char == 's') 
-			SRAM_test();
-			
+		if (received_char == 's') {
+			SRAM_test();	
+		}
 		else if (received_char == 'a') {
 			Read_ADC();
 			
@@ -86,12 +91,73 @@ int main(void)
 			
 			Calibrate_Joystick();
 		}	
+		
+		else if (received_char == 'r') {
+						
+			OLED_Init();
+			
+			printf("r\n");
+			
+			Write_OLED(0b00000000, 1);
+			Write_OLED(0b00011000, 1);
+			Write_OLED(0b00011000, 1);
+			Write_OLED(0b00011000, 1);
+			Write_OLED(0b01111110, 1);
+			Write_OLED(0b00111100, 1);
+			Write_OLED(0b00011000, 1);
+			Write_OLED(0b00000000, 1);
+		}
 
 	}
 }
 
 
+// Copied directly from datasheet
+void OLED_Init(void) {
+	Write_OLED(0xae, 0); // display off
+	Write_OLED(0xa1, 0); //segment remap
+	Write_OLED(0xda, 0); //common pads hardware: alternative
+	Write_OLED(0x12, 0);
+	Write_OLED(0xc8, 0); //common output scan direction:com63~com0
+	Write_OLED(0xa8, 0); //multiplex ration mode:63
+	Write_OLED(0x3f, 0);
+	Write_OLED(0xd5, 0); //display divide ratio/osc. freq. mode
+	Write_OLED(0x80, 0);
+	Write_OLED(0x81, 0); //contrast control
+	Write_OLED(0x50, 0);
+	Write_OLED(0xd9, 0); //set pre-charge period
+	Write_OLED(0x21, 0);
+	Write_OLED(0x20, 0); //Set Memory Addressing Mode
+	Write_OLED(0x02, 0);
+	Write_OLED(0xdb, 0); //VCOM deselect level mode
+	Write_OLED(0x30, 0);
+	Write_OLED(0xad, 0); //master configuration
+	Write_OLED(0x00, 0);
+	Write_OLED(0xa4, 0); //out follows RAM content
+	Write_OLED(0xa6, 0); //set normal display
+	Write_OLED(0xaf, 0); // display on 
+}
 
+void Write_OLED(char msg, char cd) {
+	// C/!D
+	if (cd) {
+		PORTE |= (1 << PINE2);
+		PORTC &= 0x11110000;  // Enables CS
+	}
+	else {
+		PORTE &= !(1 << PINE2);
+		PORTC &= 0x11110010;
+		PORTC |= 0x00000010;
+	}
+	
+	_delay_ms(1);
+	PORTD &= !(1 << 6);   // Sets !WR low
+	_delay_ms(1);	
+	PORTA = msg;		  // Puts msg on data bus
+	_delay_ms(1);
+	PORTD |= (1 << 6);	  // Disables CS
+	_delay_ms(1);
+}
 
 void Calibrate_Joystick(void) {
 	offset_x = 0;
@@ -150,8 +216,8 @@ unsigned char USART_Receive(void) {
 void latch_test(char received_char) {
 	switch (received_char) {
 		case 'e': PORTE &= 0b11111101; break;
-		case 'd': PORTE |= 0b00000010; break;
-		
+		case 'd': PORTE |= 0b00000010; break;	
+			
 		case '1': PORTA = 0b00000001; break;
 		case '2': PORTA = 0b00000010; break;
 		case '3': PORTA = 0b00000100; break;
