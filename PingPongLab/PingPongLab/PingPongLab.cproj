@@ -142,7 +142,13 @@
     <Compile Include="main.c">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="mcp2515.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="OLED.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="SPI.h">
       <SubType>compile</SubType>
     </Compile>
   </ItemGroup>
