@@ -9,10 +9,19 @@
 #define BAUD 9600
 #define MYUBRR 31 //F_CPU/16/BAUD-1
 
+#define CENTER 0
+#define UP 1
+#define DOWN 2
+#define LEFT 3
+#define RIGHT 4
+#define DEAD 5
+
 #include <util/delay.h>
 #include <avr/io.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "fonts.h"
+#include "OLED.h"
 
 void latch_test(char received_char);
 void SRAM_test(void);
@@ -21,7 +30,8 @@ void USART_Transmit(unsigned char data);
 unsigned char USART_Receive(void);
 void CLK_Init(int TOP);
 void SRAM_Init(void);
-
+void screen0(void);
+void screen1(void);
 
 static FILE uart_stdio = FDEV_SETUP_STREAM(
 	(int(*)(char, struct __file *))USART_Transmit, 
@@ -36,35 +46,164 @@ volatile char analog3 = 0;
 int offset_x = 0;
 int offset_y = 0;
 
-
 int main(void)
 {
 	DDRA = 0xFF;
-	DDRE |= 0x02;
+	DDRE |= (0x02);
 	
-	// Joystick button inputs
+	// Right and left button inputs
 	DDRD &= !( (1 << PD2) | (1 << PD3) );
+	// Data/!Command output
+	DDRE |= (1 << PE2);
+	// Joystick button
+	DDRE &= !(1 << PE0);
 	
 	USART_Init(MYUBRR);
 	CLK_Init(0);
 	SRAM_Init();
+	OLED_Init();
 	
 	// Setup for printf
 	stdout = &uart_stdio;
 	stdin = &uart_stdio;
 	
 	unsigned char received_char = 0;
+	char prev_button_left = 0;
+	char prev_button_right = 0;
+	char prev_joystick_button = 0;
+	char ready_to_move = 1;
+	char arrow_pos = 0;
+	char min_pos = 0;
+	char max_pos = 0;
+	char screen = 0;
+	char prev_screen = 1;
+	
+	// OLED_send_command(0xA6);
+	
+	OLED_reset();
+	
+	// OLED_pos(2, 0);
+	// OLED_print("Test", 4);
+	
+	
+	// screen0();
+	
+	// OLED_send_command(0xA5);
+	
+	
 	
     while (1) {
-				
-		received_char = USART_Receive();
+		
+		// printf("a\n");
+
+		
+		// received_char = USART_Receive();
+		
 		char button_left = !!(PIND & (1 << PIND3));
 		char button_right = !!(PIND & (1 << PIND2));
+		char joystick_button = !(PINE & (1 << PINE0));
+		
+		char button_right_pressed, button_left_pressed, joystick_button_pressed = 0;
+		
+		if (button_right && !prev_button_right)
+			button_right_pressed = 1;
+		if (button_left && !prev_button_left)
+			button_left_pressed = 1;
+		if (joystick_button && !prev_joystick_button)
+			joystick_button_pressed = 1;
 		
 		
-		if (received_char == 's') 
-			SRAM_test();
-			
+		if (screen != prev_screen) {
+			if (screen == 0) {
+				screen0();
+				min_pos = 2;
+				max_pos = 3;
+			}
+			if (screen == 1) {
+				screen1();
+				min_pos = 2;
+				max_pos = 6;
+			}
+			arrow_pos = min_pos;
+			OLED_print_arrow(arrow_pos, 0);
+			prev_screen = screen;
+		} 
+		
+		
+		if (screen == 0 && joystick_button_pressed) {
+			if (arrow_pos == min_pos) {
+				printf("Button pressed\n");
+			}
+			if (arrow_pos == min_pos + 1) {
+				screen = 1;
+			}
+		}
+		else if (screen == 1 && joystick_button_pressed) {
+
+			if (arrow_pos == max_pos) {
+				screen = 0;
+			}
+			else {
+				printf("Option %d selected\n", arrow_pos-min_pos+1);
+			}
+		}
+		
+		
+		Read_ADC();
+		int x = (100*(analog0 - 128))/128 - offset_x;
+		int y = (100*(analog1 - 128))/128 - offset_y;
+
+		unsigned int direction = CENTER;
+		if      (x > 0 && abs(y) < abs(x)) direction = RIGHT; 
+		else if (y > 0 && abs(x) < abs(y)) direction = UP;
+		else if (x < 0 && abs(y) < abs(x)) direction = LEFT;
+		else if (y < 0 && abs(x) < abs(y)) direction = DOWN; 
+		
+		if (x*x + y*y < 80*80) direction = DEAD;
+		if (x*x + y*y < 60*60) direction = CENTER;
+		
+		
+		if (direction == CENTER)
+			ready_to_move = 1;
+		
+		if (ready_to_move) {
+			if (direction == UP) {
+				OLED_goto_column(0);
+				OLED_print(" ", 1);
+				if (arrow_pos > min_pos) 
+					arrow_pos -= 1;
+				OLED_print_arrow(arrow_pos, 0);
+				ready_to_move = 0;
+			}
+			else if (direction == DOWN) {
+				OLED_goto_column(0);
+				OLED_print(" ", 1);
+				if (arrow_pos < max_pos) 
+					arrow_pos += 1;
+				OLED_print_arrow(arrow_pos, 0);
+				ready_to_move = 0;
+			}
+			else if (direction == LEFT) {
+				
+				ready_to_move = 0;
+			}
+			else if (direction == RIGHT) {
+				
+				ready_to_move = 0;
+			}
+		}
+		
+		
+		
+		
+		
+		
+		
+
+		
+		if (received_char == 's') {
+			SRAM_test();	
+		}
 		else if (received_char == 'a') {
 			Read_ADC();
 			
@@ -81,17 +220,69 @@ int main(void)
 		}
 		
 		else if (received_char == 'c') {
-			int x_pos = (100*analog0 - 12800)/128;
-			int y_pos = (100*analog1 - 12800)/128;
+			x = (100*analog0 - 12800)/128;
+			y = (100*analog1 - 12800)/128;
 			
 			Calibrate_Joystick();
 		}	
+		
+		else if (received_char == 'r') {
 
+			printf("r\n");			
+
+			OLED_print_arrow(0, 0);
+			OLED_print("Hello, world!", 13);
+			
+		}
+		else if (received_char == 'k') OLED_reset();
+		else if (received_char == 'i') OLED_Init();
+		
+		
+		
+		
+		prev_button_left = button_left;
+		prev_button_right = button_right;
+		prev_joystick_button = joystick_button;
+		
 	}
+	
+	
 }
 
 
 
+
+
+
+
+void screen0(void) {
+	OLED_reset();
+	OLED_pos(0, 10);
+	OLED_print("Main menu", 9);
+	OLED_pos(1, 10);
+	for (int i = 0; i < 9*8; i++) OLED_send_data(0b00000001);
+	OLED_pos(2, 10);
+	OLED_print("Print test", 10);
+	OLED_pos(3, 10);
+	OLED_print("Options", 7);
+}
+
+void screen1(void) {
+	OLED_reset();
+	OLED_pos(0, 10);
+	OLED_print("Options", 7);
+	OLED_pos(1, 10);
+	for (int i = 0; i < 9*8; i++) OLED_send_data(0b00000001);
+	
+	for (char i = 0; i < 4; i++) {
+		OLED_pos(i+2, 10);
+		OLED_print("Option ", 7);
+		OLED_print_char(49 + i);
+	}
+	
+	OLED_pos(6, 10);
+	OLED_print("Main menu", 9);
+}
 
 void Calibrate_Joystick(void) {
 	offset_x = 0;
@@ -150,8 +341,8 @@ unsigned char USART_Receive(void) {
 void latch_test(char received_char) {
 	switch (received_char) {
 		case 'e': PORTE &= 0b11111101; break;
-		case 'd': PORTE |= 0b00000010; break;
-		
+		case 'd': PORTE |= 0b00000010; break;	
+			
 		case '1': PORTA = 0b00000001; break;
 		case '2': PORTA = 0b00000010; break;
 		case '3': PORTA = 0b00000100; break;
@@ -210,7 +401,7 @@ void SRAM_Init(void) {
 }
 
 void CLK_Init(int TOP) {
-	// Set PD5 as output
+	// Set PD4 as output
 	DDRD |= (1 << DDD4);
 	
 	// Compare output mode: Toggle compare match
