@@ -51,7 +51,7 @@ int main(void)
 	DDRA = 0xFF;
 	DDRE |= (0x02);
 	
-	// Joystick button inputs
+	// Right and left button inputs
 	DDRD &= !( (1 << PD2) | (1 << PD3) );
 	// Data/!Command output
 	DDRE |= (1 << PE2);
@@ -78,16 +78,27 @@ int main(void)
 	char screen = 0;
 	char prev_screen = 1;
 	
-	OLED_send_command(0xA6);
+	// OLED_send_command(0xA6);
+	
 	OLED_reset();
-	screen1();
+	
+	// OLED_pos(2, 0);
+	// OLED_print("Test", 4);
+	
+	
+	// screen0();
+	
+	// OLED_send_command(0xA5);
 	
 	
 	
     while (1) {
-		printf("a\n");
+		
+		// printf("a\n");
+
+		
 		// received_char = USART_Receive();
-		/*
+		
 		char button_left = !!(PIND & (1 << PIND3));
 		char button_right = !!(PIND & (1 << PIND2));
 		char joystick_button = !(PINE & (1 << PINE0));
@@ -110,11 +121,12 @@ int main(void)
 			}
 			if (screen == 1) {
 				screen1();
-				min_pos = 0;
-				max_pos = 7;
+				min_pos = 2;
+				max_pos = 6;
 			}
 			arrow_pos = min_pos;
 			OLED_print_arrow(arrow_pos, 0);
+			prev_screen = screen;
 		} 
 		
 		
@@ -124,6 +136,15 @@ int main(void)
 			}
 			if (arrow_pos == min_pos + 1) {
 				screen = 1;
+			}
+		}
+		else if (screen == 1 && joystick_button_pressed) {
+
+			if (arrow_pos == max_pos) {
+				screen = 0;
+			}
+			else {
+				printf("Option %d selected\n", arrow_pos-min_pos+1);
 			}
 		}
 		
@@ -210,9 +231,7 @@ int main(void)
 			printf("r\n");			
 
 			OLED_print_arrow(0, 0);
-			char msg[] = "Hello, world!";
-			int length = sizeof(msg) / sizeof(char);
-			OLED_print(msg, length);
+			OLED_print("Hello, world!", 13);
 			
 		}
 		else if (received_char == 'k') OLED_reset();
@@ -223,9 +242,8 @@ int main(void)
 		
 		prev_button_left = button_left;
 		prev_button_right = button_right;
-		prev_screen = screen;
 		prev_joystick_button = joystick_button;
-		*/
+		
 	}
 	
 	
@@ -251,11 +269,19 @@ void screen0(void) {
 
 void screen1(void) {
 	OLED_reset();
-	for (char i = 0; i < 8; i++) {
-		OLED_pos(i, 10);
+	OLED_pos(0, 10);
+	OLED_print("Options", 7);
+	OLED_pos(1, 10);
+	for (int i = 0; i < 9*8; i++) OLED_send_data(0b00000001);
+	
+	for (char i = 0; i < 4; i++) {
+		OLED_pos(i+2, 10);
 		OLED_print("Option ", 7);
 		OLED_print_char(49 + i);
 	}
+	
+	OLED_pos(6, 10);
+	OLED_print("Main menu", 9);
 }
 
 void Calibrate_Joystick(void) {
