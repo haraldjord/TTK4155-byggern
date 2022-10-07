@@ -20,10 +20,12 @@
 #include <avr/io.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "mcp2515.h"
 #include "fonts.h"
 #include "OLED.h"
 #include "SPI.h"
+#include "MCP.h"
+#include "mcp2515.h"
+#include "CAN.h"
 
 void latch_test(char received_char);
 void SRAM_test(void);
@@ -64,6 +66,7 @@ int main(void)
 	SRAM_Init();
 	OLED_Init();
 	SPI_Init();
+	CAN_Init();
 	
 	// Setup for printf
 	stdout = &uart_stdio;
@@ -82,15 +85,18 @@ int main(void)
 	
 	OLED_reset();	
 	
+	message msg, msg_received;
+	msg.ID = 1;
+	msg.length = 4;
+	msg.data[0] = "Test";
+	
+	CAN_send(msg);
+	_delay_ms(100);
+	msg_received = CAN_receive();
+	
 	
 	while (1) {
-		//SPI_tranceive('A');
-		
-		PORTB &= (~(1 << PB4));
-		SPI_write('a');
-		PORTB |= (1<<PB4);
-		// _delay_ms(10);
-		printf("0\n");
+		printf("ID: %d, length: %d, message: %s\n");
 	}
 	
 	

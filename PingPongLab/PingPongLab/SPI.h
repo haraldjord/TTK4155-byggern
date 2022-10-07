@@ -10,9 +10,6 @@
 #define SPI_H_
 #include <avr/io.h>
 
-void SPI_Init(void);
-//void SPI_tranceive(char);
-
 void SPI_Init(void) {
 	// Sets MOSI, SCK, !SS as outputs and MISO as input
 	DDRB |= (1 << DDB4) | (1 << DDB5) | (1 << DDB7);
@@ -20,23 +17,10 @@ void SPI_Init(void) {
 	
 	// Enable SPI as master, clock rate f_osc/16
 	SPCR |= (1 << SPE) | (1 << MSTR) | (1 << SPR0);	
-	//PORTB |= (1 << PINB4); // Slave deselect
 }
 
-
-/*
-void SPI_tranceive(char data) {
-	//PORTB &= !(1 << PINB4); // Slave select
-	
-	SPDR = data;
-	while ( !(SPSR & (1 << SPIF)) );
-
-	//PORTB |= (1 << PINB4); // Slave deselect
-	
-	//data = SPDR;
-	//return data;
-}
-*/
+// Loopback mode
+// XFh: 010 00111
 
 void SPI_write(unsigned char data){
 	SPDR = data;
@@ -48,6 +32,6 @@ unsigned char SPI_read(){
 	while(!(SPSR & (1 << SPIF)));
 	return SPDR;
 }
-// 01100001
+
 
 #endif /* SPI_H_ */
