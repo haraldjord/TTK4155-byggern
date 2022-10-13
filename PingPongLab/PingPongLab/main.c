@@ -18,6 +18,7 @@
 
 #include <util/delay.h>
 #include <avr/io.h>
+#include <avr/interrupt.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "fonts.h"
@@ -26,6 +27,7 @@
 #include "MCP.h"
 #include "mcp2515.h"
 #include "CAN.h"
+#include <string.h>
 
 void latch_test(char received_char);
 void SRAM_test(void);
@@ -50,6 +52,13 @@ volatile char analog2 = 0;
 volatile char analog3 = 0;
 int offset_x = 0;
 int offset_y = 0;
+volatile char new_message = 0;
+
+
+ISR(INT2_vect) {
+	new_message = 1;
+}
+
 
 int main(void)
 {
@@ -60,6 +69,19 @@ int main(void)
 	DDRD &= !( (1 << PD2) | (1 << PD3) );
 	// Joystick button
 	DDRE &= !(1 << PE2);
+	
+	// Set interrupt pin as input
+	DDRE &= ~(1 << PE0);
+	// Disable interrupt, clear Interrupt Enable in GICR
+	GICR &= 0b00000111;
+	// Set ISC2 bit in EMCUCR
+	EMCUCR &= ~(1 << ISC2); // 1 for rising edge, 0 for falling edge
+	// Clear INT2 flag, write 1 to INTF2 in GIFR
+	GIFR |= (1 << INTF2);
+	// Enable interrupt, set Interrupt Enable in GICR
+	GICR |= (1 << INT2);
+	// Enable I-bit in SREG to enable interrupts
+	sei();
 	
 	USART_Init(MYUBRR);
 	CLK_Init(0);
@@ -86,17 +108,28 @@ int main(void)
 	OLED_reset();	
 	
 	message msg, msg_received;
-	msg.ID = 1;
-	msg.length = 4;
-	msg.data[0] = "Test";
+	msg.ID = 42;
+	msg.length = 8;
+	strcpy(msg.data, "TestTest");
 	
-	CAN_send(msg);
-	_delay_ms(100);
-	msg_received = CAN_receive();
+	
 	
 	
 	while (1) {
-		printf("ID: %d, length: %d, message: %s\n");
+		
+		received_char = USART_Receive();
+		
+		if (received_char == 's') {
+			CAN_send(msg);
+			printf("Message sent\n");
+		}
+		
+		if (received_char == 'r' || new_message) {
+			msg_received = CAN_receive();
+			printf("ID: %d, length: %d, message: %s\n", msg_received.ID, msg_received.length, msg_received.data);
+			new_message = 0;
+		}
+		
 	}
 	
 	
@@ -249,10 +282,6 @@ int main(void)
 	
 	
 }
-
-
-
-
 
 
 

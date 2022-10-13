@@ -2,7 +2,7 @@
  * CAN.h
  *
  * Created: 07.10.2022 11:39:04
- *  Author: haraljor
+ * Author: haraljor
  */ 
 
 
@@ -13,9 +13,9 @@
 
 
 typedef struct Message {
-	int ID;
-	char data[8];
-	char length;
+	unsigned int ID;
+	unsigned char data[9]; // 8 data + \0
+	unsigned char length;
 } message;
 
 
@@ -23,7 +23,8 @@ void CAN_Init() {
 	// Reset MCP and put it in loopback mode
 	MCP_reset();
 	MCP_write(MCP_CANCTRL, MODE_LOOPBACK);
-	MCP_bitmod(0x60, 0b1100000, 0xFF);			// Turn masks/filters off
+	MCP_bitmod(MCP_CANINTE, 1, 1);				// Enable interrupt from receive buffer 0
+	MCP_bitmod(MCP_RXB0CTRL, 0b1100000, 0xFF);	// Turn masks/filters off
 }
 
 void CAN_send(message msg) {
@@ -54,6 +55,9 @@ message CAN_receive() {
 		char DM = MCP_read(0x66+m);
 		msg.data[m] = DM;
 	}
+	
+	// Clear interrupt flags
+	MCP_write(MCP_CANINTF, 0);
 	
 	return msg;
 }
