@@ -18,16 +18,23 @@
 
 #include <util/delay.h>
 #include <avr/io.h>
+#include <avr/interrupt.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "fonts.h"
 #include "OLED.h"
+#include "SPI.h"
+#include "MCP.h"
+#include "mcp2515.h"
+#include "CAN.h"
+#include <string.h>
 
 void latch_test(char received_char);
 void SRAM_test(void);
 void USART_Init(unsigned int ubrr);
 void USART_Transmit(unsigned char data);
 unsigned char USART_Receive(void);
+void Read_ADC(void);
 void CLK_Init(int TOP);
 void SRAM_Init(void);
 void screen0(void);
@@ -45,6 +52,13 @@ volatile char analog2 = 0;
 volatile char analog3 = 0;
 int offset_x = 0;
 int offset_y = 0;
+volatile char new_message = 0;
+
+
+ISR(INT2_vect) {
+	new_message = 1;
+}
+
 
 int main(void)
 {
@@ -53,15 +67,28 @@ int main(void)
 	
 	// Right and left button inputs
 	DDRD &= !( (1 << PD2) | (1 << PD3) );
-	// Data/!Command output
-	DDRE |= (1 << PE2);
 	// Joystick button
-	DDRE &= !(1 << PE0);
+	DDRE &= !(1 << PE2);
+	
+	// Set interrupt pin as input
+	DDRE &= ~(1 << PE0);
+	// Disable interrupt, clear Interrupt Enable in GICR
+	GICR &= 0b00000111;
+	// Set ISC2 bit in EMCUCR
+	EMCUCR &= ~(1 << ISC2); // 1 for rising edge, 0 for falling edge
+	// Clear INT2 flag, write 1 to INTF2 in GIFR
+	GIFR |= (1 << INTF2);
+	// Enable interrupt, set Interrupt Enable in GICR
+	GICR |= (1 << INT2);
+	// Enable I-bit in SREG to enable interrupts
+	sei();
 	
 	USART_Init(MYUBRR);
 	CLK_Init(0);
 	SRAM_Init();
 	OLED_Init();
+	SPI_Init();
+	CAN_Init();
 	
 	// Setup for printf
 	stdout = &uart_stdio;
@@ -78,30 +105,41 @@ int main(void)
 	char screen = 0;
 	char prev_screen = 1;
 	
-	// OLED_send_command(0xA6);
+	OLED_reset();	
 	
-	OLED_reset();
+	message msg, msg_received;
+	msg.ID = 42;
+	msg.length = 8;
+	strcpy(msg.data, "TestTest");
 	
-	// OLED_pos(2, 0);
-	// OLED_print("Test", 4);
 	
 	
-	// screen0();
 	
-	// OLED_send_command(0xA5);
-	
+	while (1) {
+		
+		received_char = USART_Receive();
+		
+		if (received_char == 's') {
+			CAN_send(msg);
+			printf("Message sent\n");
+		}
+		
+		if (received_char == 'r' || new_message) {
+			msg_received = CAN_receive();
+			printf("ID: %d, length: %d, message: %s\n", msg_received.ID, msg_received.length, msg_received.data);
+			new_message = 0;
+		}
+		
+	}
 	
 	
     while (1) {
-		
-		// printf("a\n");
 
-		
 		// received_char = USART_Receive();
 		
 		char button_left = !!(PIND & (1 << PIND3));
 		char button_right = !!(PIND & (1 << PIND2));
-		char joystick_button = !(PINE & (1 << PINE0));
+		char joystick_button = !(PINE & (1 << PINE2));
 		
 		char button_right_pressed, button_left_pressed, joystick_button_pressed = 0;
 		
@@ -162,7 +200,8 @@ int main(void)
 		if (x*x + y*y < 80*80) direction = DEAD;
 		if (x*x + y*y < 60*60) direction = CENTER;
 		
-		
+		 
+		 
 		if (direction == CENTER)
 			ready_to_move = 1;
 		
@@ -195,12 +234,7 @@ int main(void)
 		
 		
 		
-		
-		
-		
-		
-
-		
+		/*
 		if (received_char == 's') {
 			SRAM_test();	
 		}
@@ -236,7 +270,7 @@ int main(void)
 		}
 		else if (received_char == 'k') OLED_reset();
 		else if (received_char == 'i') OLED_Init();
-		
+		*/
 		
 		
 		
@@ -248,10 +282,6 @@ int main(void)
 	
 	
 }
-
-
-
-
 
 
 
@@ -281,7 +311,7 @@ void screen1(void) {
 	}
 	
 	OLED_pos(6, 10);
-	OLED_print("Main menu", 9);
+	OLED_print("Return", 6);
 }
 
 void Calibrate_Joystick(void) {

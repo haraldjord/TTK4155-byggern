@@ -78,13 +78,11 @@ void OLED_goto_column(char column) {
 }
 
 void OLED_send_command(char msg) {
-	// PORTE &= !(1 << PE2);
 	volatile char *oled_cmd = 0x1000;
 	*oled_cmd = msg;
 }
 
 void OLED_send_data(char msg) {
-	// PORTE |= (1 << PE2);
 	volatile char *oled_data = 0x1200;
 	*oled_data = msg;
 }
