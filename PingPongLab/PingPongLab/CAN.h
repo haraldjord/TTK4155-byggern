@@ -22,7 +22,14 @@ typedef struct Message {
 void CAN_Init() {
 	// Reset MCP and put it in loopback mode
 	MCP_reset();
-	MCP_write(MCP_CANCTRL, MODE_LOOPBACK);
+	
+	// During config mode, set config registers
+	MCP_write(MCP_CNF1, 0xFF); // 4 TQ sync, TQ = 8us
+	MCP_write(MCP_CNF2, 0x3F); // 8 TQ Propagation, 8 TQ PS1, 8 TQ PS2
+	// MCP_write(MCP_CNF3, something);
+	
+	//MCP_write(MCP_CANCTRL, MODE_LOOPBACK);
+	MCP_write(MCP_CANCTRL, MODE_NORMAL);
 	MCP_bitmod(MCP_CANINTE, 1, 1);				// Enable interrupt from receive buffer 0
 	MCP_bitmod(MCP_RXB0CTRL, 0b1100000, 0xFF);	// Turn masks/filters off
 }
