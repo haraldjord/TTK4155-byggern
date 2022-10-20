@@ -24,11 +24,17 @@ int main(void)
 	// PROPAG = 7
 	// PHASE1 = 7
 	// PHASE2 = 7
-	// can_br = 0b00000000 00101001 00110111 01110111
+	// OLD VALUE can_br = 0b00000000 00101001 00110111 01110111 
 	
-	uint32_t can_br = 0x00293777;
+	// TQ = 762 ns
+	// can_br = 0b00000000 00111111 00110111 01110111
 	
+	// uint32_t can_br = 0x00293777;
+	uint32_t can_br = 0x003F3777;
+	
+	// can_init_def_tx_rx_mb(can_br);
 	can_init_def_tx_rx_mb(can_br);
+	
 	
     // LED is on PA19 and PA20
     
@@ -36,19 +42,33 @@ int main(void)
 	// OER: Output Enable Register
     PIOA->PIO_PER = PIO_PER_P19 | PIO_PER_P20;
     PIOA->PIO_OER = PIO_OER_P19 | PIO_OER_P20;
-	
 		
     while (1) 
-    {
-		printf("Test\r");
+    {	
+		// printf("Test\r");
 		
 		CAN_MESSAGE msg;
+		char receive = can_receive(&msg, 1);		
+		char send = 1; // can_send(&msg, 0);
+		
+		printf("ID: %d, length: %d, message: %s, send: %d, receive: %d\r", msg.id, msg.data_length, msg.data, send, receive);
+		
+		uint32_t can_sr = CAN0->CAN_SR;
+		printf("%u\r", (unsigned int)can_sr);
+		
+		uint32_t can_imr = CAN0->CAN_IMR;
+		printf("%u\r", (unsigned int)can_imr);
+		
+		
+		return;
+		
+		
+		/*
 		msg.id = 12;
 		msg.data_length = 4;
 		strcpy(msg.data, "Test");
-		
-		can_send(&msg, 0);
-		
+		*/
+
 		// SODR: Set Output Data Register
 		// CODR: Clear Output Data Register
 	

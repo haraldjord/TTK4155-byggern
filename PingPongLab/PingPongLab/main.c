@@ -52,11 +52,12 @@ volatile char analog2 = 0;
 volatile char analog3 = 0;
 int offset_x = 0;
 int offset_y = 0;
-volatile char new_message = 0;
+volatile char interrupt_flag = 0;
+char new_message = 0;
 
 
 ISR(INT2_vect) {
-	new_message = 1;
+	interrupt_flag = 1;
 }
 
 
@@ -109,15 +110,49 @@ int main(void)
 	
 	message msg, msg_received;
 	msg.ID = 42;
-	msg.length = 8;
-	strcpy(msg.data, "TestTest");
+	msg.length = 7;
+	strcpy(msg.data, "TEST123");
 	
 	
 	
 	
 	while (1) {
 		
-		received_char = USART_Receive();
+		
+		if (interrupt_flag) {
+			char status = MCP_status();
+			
+			if (status & 0x03) {
+				// RX0IF and RX1IF
+				new_message = 1;
+			}
+			if (status & 0xA8) {
+				// TX0IF
+				MCP_bitmod(MCP_CANINTF, 0xA8, 0x00);
+			}
+			
+		}
+		
+		
+		
+		// received_char = USART_Receive();
+		
+		
+		
+		CAN_send(msg);
+		printf("ID: %d, length: %d, message: %s\n", msg.ID, msg.length, msg.data);
+		
+		
+		char EFLG = MCP_read(MCP_EFLG);
+		char status = MCP_status();
+		char rx_status = MCP_read(MCP_RX_STATUS);
+		printf("EFLG: %X\n", EFLG);
+		printf("Status: %X, RX_status: %X\n", status, rx_status);
+		
+		_delay_ms(3000);
+		
+		
+		
 		
 		if (received_char == 's') {
 			CAN_send(msg);
@@ -125,9 +160,18 @@ int main(void)
 		}
 		
 		if (received_char == 'r' || new_message) {
+			
+			
 			msg_received = CAN_receive();
 			printf("ID: %d, length: %d, message: %s\n", msg_received.ID, msg_received.length, msg_received.data);
 			new_message = 0;
+			
+			
+			char EFLG = MCP_read(MCP_EFLG);
+			char status = MCP_status();
+			char rx_status = MCP_read(MCP_RX_STATUS);
+			printf("EFLG: %X\n", EFLG);
+			printf("Status: %X, RX_status: %X\n", status, rx_status);
 		}
 		
 	}

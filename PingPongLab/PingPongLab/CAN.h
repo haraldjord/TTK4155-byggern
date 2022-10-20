@@ -24,19 +24,21 @@ void CAN_Init() {
 	MCP_reset();
 	
 	// During config mode, set config registers
-	MCP_write(MCP_CNF1, 0xFF); // 4 TQ sync, TQ = 8us
+	//MCP_write(MCP_CNF1, 0xFF); // 4 TQ sync, TQ = 8us
+	MCP_write(MCP_CNF1, 0xC5);
 	MCP_write(MCP_CNF2, 0x3F); // 8 TQ Propagation, 8 TQ PS1, 8 TQ PS2
 	// MCP_write(MCP_CNF3, something);
 	
 	//MCP_write(MCP_CANCTRL, MODE_LOOPBACK);
 	MCP_write(MCP_CANCTRL, MODE_NORMAL);
-	MCP_bitmod(MCP_CANINTE, 1, 1);				// Enable interrupt from receive buffer 0
-	MCP_bitmod(MCP_RXB0CTRL, 0b1100000, 0xFF);	// Turn masks/filters off
+	MCP_bitmod(MCP_CANINTE, 0x01, 0x01);	// Enable interrupt from receive buffer 0
+	MCP_bitmod(MCP_RXB0CTRL, 0xC0, 0xC0);	// Turn masks/filters off
 }
 
 void CAN_send(message msg) {
 	MCP_write( 0x31, (char)(msg.ID >> 3) );		// RXB0SIDH, set message identifier high bits
 	MCP_write( 0x32, (char)(msg.ID << 5) );		// RXB0SIDL, set message identifier low bits
+	MCP_write( 0x35, 0x00 );
 	MCP_bitmod( 0x35, 0b0001111, msg.length );	// TXB0DLC, set message length and select standard frame
 	
 	for (int m = 0; m < msg.length; m++) {
@@ -44,6 +46,7 @@ void CAN_send(message msg) {
 	}	
 	
 	MCP_bitmod(MCP_TXB0CTRL, 0b00001000, 0xFF);	// Set Message Transmit request bit high
+	// MCP_rts();
 }
 
 message CAN_receive() {
@@ -64,7 +67,7 @@ message CAN_receive() {
 	}
 	
 	// Clear interrupt flags
-	MCP_write(MCP_CANINTF, 0);
+	MCP_bitmod(MCP_CANINTF, 0x03, 0x00);
 	
 	return msg;
 }
