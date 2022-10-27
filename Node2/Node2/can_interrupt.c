@@ -20,6 +20,8 @@
 
 #define DEBUG_INTERRUPT 0
 
+CAN_MESSAGE message;
+
 /**
  * \brief CAN0 Interrupt handler for RX, TX and bus error interrupts
  *
@@ -35,7 +37,7 @@ void CAN0_Handler( void )
 	//RX interrupt
 	if(can_sr & (CAN_SR_MB1 | CAN_SR_MB2) )//Only mailbox 1 and 2 specified for receiving
 	{
-		CAN_MESSAGE message;
+		// CAN_MESSAGE message;
 		if(can_sr & CAN_SR_MB1)  //Mailbox 1 event
 		{
 			can_receive(&message, 1);

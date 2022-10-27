@@ -116,12 +116,13 @@ int main(void)
 	
 	
 	
-	while (1) {
-		
-		
+    while (1) {
+
+
+
 		if (interrupt_flag) {
 			char status = MCP_status();
-			
+	
 			if (status & 0x03) {
 				// RX0IF and RX1IF
 				new_message = 1;
@@ -130,54 +131,55 @@ int main(void)
 				// TX0IF
 				MCP_bitmod(MCP_CANINTF, 0xA8, 0x00);
 			}
-			
+	
 		}
-		
-		
-		
+
+
+
 		// received_char = USART_Receive();
-		
-		
-		
+
+
+		/*
 		CAN_send(msg);
 		printf("ID: %d, length: %d, message: %s\n", msg.ID, msg.length, msg.data);
-		
-		
+
+
 		char EFLG = MCP_read(MCP_EFLG);
 		char status = MCP_status();
 		char rx_status = MCP_read(MCP_RX_STATUS);
 		printf("EFLG: %X\n", EFLG);
 		printf("Status: %X, RX_status: %X\n", status, rx_status);
-		
+
 		_delay_ms(3000);
-		
-		
-		
-		
+		*/
+
+
+		/*
 		if (received_char == 's') {
 			CAN_send(msg);
 			printf("Message sent\n");
 		}
-		
-		if (received_char == 'r' || new_message) {
-			
-			
+		*/
+
+		if (new_message) {
+	
 			msg_received = CAN_receive();
 			printf("ID: %d, length: %d, message: %s\n", msg_received.ID, msg_received.length, msg_received.data);
 			new_message = 0;
-			
-			
+	
 			char EFLG = MCP_read(MCP_EFLG);
 			char status = MCP_status();
 			char rx_status = MCP_read(MCP_RX_STATUS);
 			printf("EFLG: %X\n", EFLG);
 			printf("Status: %X, RX_status: %X\n", status, rx_status);
 		}
-		
-	}
-	
-	
-    while (1) {
+
+
+
+
+
+
+
 
 		// received_char = USART_Receive();
 		
@@ -234,7 +236,22 @@ int main(void)
 		Read_ADC();
 		int x = (100*(analog0 - 128))/128 - offset_x;
 		int y = (100*(analog1 - 128))/128 - offset_y;
-
+		
+		msg.ID = 0;
+		msg.data[0] = x;
+		msg.data[1] = y;
+		msg.data[2] = analog2;
+		msg.data[3] = analog3;
+		msg.data[4] = button_left;
+		msg.data[5] = button_right;
+		msg.length = 6;
+		CAN_send(msg);
+		
+		printf("ID: %d, length: %d, message: ", msg.ID, msg.length);
+		for (int i = 0; i < msg.length; i++)
+			printf("%d ", msg.data[i]);
+		printf("\n");
+		
 		unsigned int direction = CENTER;
 		if      (x > 0 && abs(y) < abs(x)) direction = RIGHT; 
 		else if (y > 0 && abs(x) < abs(y)) direction = UP;

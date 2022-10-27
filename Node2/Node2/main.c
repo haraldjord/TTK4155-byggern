@@ -5,6 +5,7 @@
  * Author : chrimeh
  */ 
 
+
 #include "sam.h"
 #include "sam3x8e.h"
 #include "printf-stdarg.h"
@@ -15,6 +16,7 @@
 
 int main(void)
 {
+	WDT->WDT_MR = WDT_MR_WDDIS; 
     SystemInit();
 	configure_uart();
 	
@@ -47,20 +49,33 @@ int main(void)
     {	
 		// printf("Test\r");
 		
-		CAN_MESSAGE msg;
-		char receive = can_receive(&msg, 1);		
-		char send = 1; // can_send(&msg, 0);
+		// CAN_MESSAGE msg;
 		
-		printf("ID: %d, length: %d, message: %s, send: %d, receive: %d\r", msg.id, msg.data_length, msg.data, send, receive);
+		// char receive = can_receive(&msg, 0);		
+		// char send = 1; // can_send(&msg, 0);
 		
-		uint32_t can_sr = CAN0->CAN_SR;
-		printf("%u\r", (unsigned int)can_sr);
+		// printf("ID: %d, length: %d, message: %s, send: %d, receive: %d\r", msg.id, msg.data_length, msg.data, send, receive);
 		
-		uint32_t can_imr = CAN0->CAN_IMR;
-		printf("%u\r", (unsigned int)can_imr);
+		// 
+		extern CAN_MESSAGE message;
+		//printf("ID: %d, length: %d, message: %X\r", message.id, message.data_length, message.data[2]);
+		
+		printf("ID: %d, length: %d, message: ", message.id, message.data_length);
+		for (int i = 0; i < message.data_length; i++)
+			printf("%d ", message.data[i]);
+		printf("\n\r");
 		
 		
-		return;
+		// CAN Status Register
+		//uint32_t can_sr = CAN0->CAN_SR;
+		//printf("%u\r", (unsigned int)can_sr);
+		
+		// CAN Interrupt Mask Register
+		//uint32_t can_imr = CAN0->CAN_IMR;
+		//printf("%u\r", (unsigned int)can_imr);
+		
+		
+		
 		
 		
 		/*
