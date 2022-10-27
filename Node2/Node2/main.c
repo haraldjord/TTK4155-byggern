@@ -16,7 +16,7 @@
 
 int main(void)
 {
-	WDT->WDT_MR = WDT_MR_WDDIS; 
+	WDT->WDT_MR = WDT_MR_WDDIS; // Turns off watchdog
     SystemInit();
 	configure_uart();
 	
@@ -44,57 +44,33 @@ int main(void)
 	// OER: Output Enable Register
     PIOA->PIO_PER = PIO_PER_P19 | PIO_PER_P20;
     PIOA->PIO_OER = PIO_OER_P19 | PIO_OER_P20;
+	
+	// For PWM: PC22
+	PIOC->PIO_PDR |= PIO_PDR_P22;
+	PIOC->PIO_ABSR |= PIO_ABSR_P22;
+		
+	/* Useful PWM registers */
+	// PWM_CLK
+	// PWM_CMRn
+	// PWM_CPRD(UPD)n
+	// PWM_CDTY(UPD)n
+	// PWM_ENA	(PWM_DIS)
+
+	
+	PWM->PWM_CLK |= (0x0A << PWM_CLK_PREA) | (0x0A << PWM_CLK_PREB);
+	PWM->PWM_CLK |= (255 << PWM_CLK_DIVA)  | (255 << PWM_CLK_DIVB);
+		
+	
 		
     while (1) 
     {	
-		// printf("Test\r");
 		
-		// CAN_MESSAGE msg;
-		
-		// char receive = can_receive(&msg, 0);		
-		// char send = 1; // can_send(&msg, 0);
-		
-		// printf("ID: %d, length: %d, message: %s, send: %d, receive: %d\r", msg.id, msg.data_length, msg.data, send, receive);
-		
-		// 
 		extern CAN_MESSAGE message;
-		//printf("ID: %d, length: %d, message: %X\r", message.id, message.data_length, message.data[2]);
 		
 		printf("ID: %d, length: %d, message: ", message.id, message.data_length);
 		for (int i = 0; i < message.data_length; i++)
 			printf("%d ", message.data[i]);
 		printf("\n\r");
 		
-		
-		// CAN Status Register
-		//uint32_t can_sr = CAN0->CAN_SR;
-		//printf("%u\r", (unsigned int)can_sr);
-		
-		// CAN Interrupt Mask Register
-		//uint32_t can_imr = CAN0->CAN_IMR;
-		//printf("%u\r", (unsigned int)can_imr);
-		
-		
-		
-		
-		
-		/*
-		msg.id = 12;
-		msg.data_length = 4;
-		strcpy(msg.data, "Test");
-		*/
-
-		// SODR: Set Output Data Register
-		// CODR: Clear Output Data Register
-	
-		/*
-		PIOA->PIO_SODR = PIO_SODR_P19;
-		PIOA->PIO_CODR = PIO_CODR_P20;
-		// delay();
-		
-		PIOA->PIO_CODR = PIO_CODR_P19;
-		PIOA->PIO_SODR = PIO_SODR_P20;
-		// delay();
-		*/
     }
 }
