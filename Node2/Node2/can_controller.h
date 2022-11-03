@@ -9,6 +9,20 @@
  */ 
 
 
+	// MCK = 84 000 000 Hz
+	// BRP = 41
+	// SJW = 3
+	// PROPAG = 7
+	// PHASE1 = 7
+	// PHASE2 = 7
+	// OLD VALUE can_br = 0b00000000 00101001 00110111 01110111
+	
+	// TQ = 762 ns
+	// can_br = 0b00000000 00111111 00110111 01110111
+	
+	// uint32_t can_br = 0x00293777; OLD VALUE
+
+
 #ifndef CAN_CONTROLLER_H_
 #define CAN_CONTROLLER_H_
 

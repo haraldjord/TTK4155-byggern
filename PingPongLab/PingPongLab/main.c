@@ -238,8 +238,8 @@ int main(void)
 		int y = (100*(analog1 - 128))/128 - offset_y;
 		
 		msg.ID = 0;
-		msg.data[0] = x;
-		msg.data[1] = y;
+		msg.data[0] = x+100;
+		msg.data[1] = y+100;
 		msg.data[2] = analog2;
 		msg.data[3] = analog3;
 		msg.data[4] = button_left;
