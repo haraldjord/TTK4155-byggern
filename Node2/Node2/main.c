@@ -17,7 +17,6 @@
 #include "PWM.h"
 #include "IR.h"
 #include <string.h>
-#include <math.h>
 
 int map_int(int x, int in_min, int in_max, int out_min, int out_max);
 
@@ -35,6 +34,14 @@ int main(void)
 	int x[filter_samples];
 	int y[filter_samples];
 	int IR[filter_samples];
+	
+	// PID variables
+	float Kp = 1;
+	float Ki = 1;
+	float e = 0;
+	float ei = 0;
+	float T = 0.02f; // For 50 Hz
+	float u = 0;
 	
 	int score_status = 0;
 	int score = 0;
@@ -97,8 +104,15 @@ int main(void)
 			score_status = 0;
 		}
 
-
-		printf("%d\n\r", score);
+		
+		/* Until we get PWM_Handler() to work */
+		if (PWM->PWM_ISR1) {
+			// calculate error e
+			ei += e;
+			u = Kp*e + T*Ki*ei;
+		}
+		
+		printf("%d\n\r", u ); //score);
 		
     }
 }
