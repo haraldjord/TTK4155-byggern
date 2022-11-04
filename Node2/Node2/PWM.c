@@ -11,8 +11,11 @@
 #include "pwm.h"
 #include "printf-stdarg.h"
 
+int pwm_c = 0;
+
 void PWM_Handler(void) {
-	printf("Test\n\r");
+	pwm_c += 1;
+	printf("%d\n\r", pwm_c/200);
 }
 
 void PWM_Init() {
@@ -37,8 +40,11 @@ void PWM_Init() {
 	
 	/*Setup interrupts for the PID controller*/
 	REG_PWM_CMPM5 |= PWM_CMPM_CEN;
-	PWM->PWM_IER1 |= PWM_IER1_CHID5;
-	PWM->PWM_IER2 |= PWM_IER2_CMPM5;
+	//__disable_irq();
+	//PWM->PWM_IER1 |= PWM_IER1_CHID5;
+	//PWM->PWM_IER2 |= PWM_IER2_CMPM5;
+	//__enable_irq();
+	//NVIC_EnableIRQ(ID_PWM);
 }	
 
 void PWM_pos(int pos) {
