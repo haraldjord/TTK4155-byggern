@@ -34,9 +34,14 @@ int map_int(int x, int in_min, int in_max, int out_min, int out_max);
 void CLK_Init(void);
 volatile int pulse_counter = 0;
 	
+
+// Ziegler-Nichols tuning
+// Ku = 1.80;
+// Tu = 0.81;
+float Kp = 0.81; // 0.45 * Ku;
+float Ki = 0.20; // 0.54 * Ku/Tu;
+
 // PID variables
-const float Kp = 0.7f;
-const float Ki = 0.1f;
 const float T = 0.02f; // For 50 Hz
 volatile int e = 0;
 volatile int ei = 0;
@@ -45,11 +50,11 @@ volatile int u = 0;
 void Encoder_update(void);
 void Encoder_reset(void);
 volatile char encoder_stage = START; // Stage of reading encoder
-char encoder_flag = 0;		// high flag indicates 20 us has passed and a read can be performed
-char encoder_rts = 1;		// Ready to start read operation from stage START.
-int  encoder_pos = 0;		// Encoder position to be used in main loop
-int  encoder_temp = 0;		// Used to store high byte during read operation
-int  reference_pos = 0;		// Reference position for PID control (in terms of encoder value)
+char encoder_flag = 0;				 // high flag indicates 20 us has passed and a read can be performed
+char encoder_rts = 1;				 // Ready to start read operation from stage START.
+int encoder_pos = 0;				 // Encoder position to be used in main loop
+int  encoder_temp = 0;				 // Used to store high byte during read operation
+int  reference_pos = 0;				 // Reference position for PID control (in terms of encoder value)
 char encoder_update_requested = 1;
 	
 	
@@ -145,8 +150,9 @@ int main(void)
 			remapped_filtered_x = map_int(filtered_x, x_offset, 100, 0, 100);
 					
 		PWM_pos(remapped_filtered_x);
-
-
+		
+		
+		
 		/* Score detection */
 		if (filtered_IR < 2000 && !score_status) {
 			score += 1;
@@ -172,7 +178,9 @@ int main(void)
 		DAC_write(dac_val*3/4);
 		*/
 		
-		reference_pos = map_int(-remapped_filtered_x, -100, 100, -5000, 5000);; //map_int(remapped_filtered_x, -100, 100, -32768, 32767);
+		// reference_pos = map_int(-remapped_filtered_x, -100, 100, -5000, 5000);; //map_int(remapped_filtered_x, -100, 100, -32768, 32767);
+		reference_pos = map_int(-slider_right, -255, 0, -5000, 5000);; //map_int(remapped_filtered_x, -100, 100, -32768, 32767);
+		// printf("%d, %d\n\r", slider_right, reference_pos);
 		if (u > 0) {
 			PIOD->PIO_CODR = DIR;
 		}
@@ -182,7 +190,7 @@ int main(void)
 		DAC_write(abs(u));
 		
 		
-		printf("%d\n\r", u);
+		printf("%d\n\r", slider_right);
 		
 
 		
@@ -203,6 +211,8 @@ int main(void)
 		}
 		if (pulse_counter > 60000) // In case of overflow
 			pulse_counter = 100;
+		
+		
 		
 		// Update encoder position every 20 ms
 		if (encoder_update_requested) {
@@ -270,7 +280,9 @@ void TC0_Handler() {
 		encoder_pos_signed -= 65536;
 	
 	e = reference_pos - encoder_pos_signed;
+	// printf("%d\n\r", encoder_pos_signed);
 	ei += e;
+	// if (ei > )
 	u = Kp*e + T*Ki*ei; // Maybe limit values
 	encoder_update_requested = 1;
 }
