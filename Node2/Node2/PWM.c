@@ -8,6 +8,15 @@
 #include "sam.h"
 #include "sam3x8e.h"
 #include "PWM.h"
+#include "pwm.h"
+#include "printf-stdarg.h"
+
+int pwm_c = 0;
+
+void PWM_Handler(void) {
+	pwm_c += 1;
+	printf("%d\n\r", pwm_c/200);
+}
 
 void PWM_Init() {
 	// Enables writing to PWM register group 0 (PWM_CLK config)
@@ -28,6 +37,14 @@ void PWM_Init() {
 	// Sets the period to the middle value and enables PWM
 	REG_PWM_CDTY5 = 123; // 126000; // 75 600 to 176 400 (0.9 ms to 2.1 ms)
 	REG_PWM_ENA = PWM_ENA_CHID5;
+	
+	/*Setup interrupts for the PID controller*/
+	REG_PWM_CMPM5 |= PWM_CMPM_CEN;
+	//__disable_irq();
+	//PWM->PWM_IER1 |= PWM_IER1_CHID5;
+	//PWM->PWM_IER2 |= PWM_IER2_CMPM5;
+	//__enable_irq();
+	//NVIC_EnableIRQ(ID_PWM);
 }	
 
 void PWM_pos(int pos) {
