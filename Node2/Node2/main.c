@@ -55,8 +55,9 @@ char encoder_rts = 1;				 // Ready to start read operation from stage START.
 int encoder_pos = 0;				 // Encoder position to be used in main loop
 int  encoder_temp = 0;				 // Used to store high byte during read operation
 int  reference_pos = 0;				 // Reference position for PID control (in terms of encoder value)
-char encoder_update_requested = 1;
-	
+char encoder_update_requested = 1;   // Encoder update requested
+char game_status = 0;				 // Only update PID when in-game
+char prev_game_status = 0;			 // Used to reset encoder position
 	
 int main(void)
 {
@@ -77,6 +78,7 @@ int main(void)
 
 	int score_status = 0;
 	int score = 0;
+	int prev_score = 0;
 	
 	int prev_button_right = 0;
 	int prev_button_left = 0;
@@ -103,7 +105,8 @@ int main(void)
 	PIOD->PIO_PER = PIO_PER_P10 | PIO_PER_P9 | PIO_PER_P2 | PIO_PER_P1 | PIO_PER_P0;
 	PIOD->PIO_OER = PIO_OER_P10 | PIO_OER_P9 | PIO_OER_P2 | PIO_OER_P1 | PIO_OER_P0;
 	
-	PIOD->PIO_SODR = DIR | EN | NOT_RST;
+	PIOD->PIO_SODR = DIR | NOT_RST;
+	PIOD->PIO_CODR = EN;
 	
 	
     while (1) 
@@ -124,6 +127,7 @@ int main(void)
 		int slider_right = message.data[3];
 		int button_left = message.data[4];
 		int button_right = message.data[5];
+		int game_status = message.data[6];
 		IR[0] = IR_read();
 		
 		/* Crude low-pass (Kalman) filter */
@@ -148,8 +152,9 @@ int main(void)
 			remapped_filtered_x = map_int(filtered_x, -100, x_offset, -100, 0);
 		else
 			remapped_filtered_x = map_int(filtered_x, x_offset, 100, 0, 100);
-					
-		PWM_pos(remapped_filtered_x);
+
+		if (game_status == 1) PWM_pos(remapped_filtered_x);
+		else PWM_pos(0);
 		
 		
 		
@@ -158,9 +163,23 @@ int main(void)
 			score += 1;
 			score_status = 1;
 		}
-		if (score_status && button_right) {
+		if (score_status && button_right && !prev_button_right) {
 			score_status = 0;
 		}
+		if (game_status == 0) score = 0;
+		
+		
+		if (score != prev_score) {
+			printf("Score: %d\n\r", score);
+			
+			CAN_MESSAGE msg;
+			msg.data[0] = score;
+			msg.data_length = 1;
+			msg.id = 43;
+			
+			can_send(&msg, 0);
+		}
+		prev_score = score;
 		
 		
 		
@@ -180,27 +199,27 @@ int main(void)
 		
 		// reference_pos = map_int(-remapped_filtered_x, -100, 100, -5000, 5000);; //map_int(remapped_filtered_x, -100, 100, -32768, 32767);
 		reference_pos = map_int(-slider_right, -255, 0, -5000, 5000);; //map_int(remapped_filtered_x, -100, 100, -32768, 32767);
-		// printf("%d, %d\n\r", slider_right, reference_pos);
-		if (u > 0) {
-			PIOD->PIO_CODR = DIR;
-		}
-		else {
-			PIOD->PIO_SODR = DIR;
-		}
+
+		if (u > 0)			  PIOD->PIO_CODR = DIR;
+		else				  PIOD->PIO_SODR = DIR;
+		if (game_status == 1) PIOD->PIO_SODR = EN;
+		else				  PIOD->PIO_CODR = EN;
 		DAC_write(abs(u));
 		
 		
-		printf("%d\n\r", slider_right);
 		
-
+		// printf("%d\n\r", encoder_pos);
 		
 		
-		if (!prev_button_left && button_left) {
+		if (game_status == 2 && prev_game_status != 2) {
+			printf("Reset encoder position\n\r");
 			Encoder_reset();
 		}
+		prev_game_status = game_status;
 		
 		/* Pulse control for solenoid */
-		if (!prev_button_right && button_right) {
+		
+		if (!prev_button_right && button_right && game_status == 1) {
 			// solenoid enable
 			PIOC->PIO_CODR = PIO_SODR_P12; // PIN51 on Due
 			pulse_counter = 0;
@@ -280,9 +299,8 @@ void TC0_Handler() {
 		encoder_pos_signed -= 65536;
 	
 	e = reference_pos - encoder_pos_signed;
-	// printf("%d\n\r", encoder_pos_signed);
-	ei += e;
-	// if (ei > )
+	if (game_status == 1) ei += e;
+	else ei = 0;
 	u = Kp*e + T*Ki*ei; // Maybe limit values
 	encoder_update_requested = 1;
 }

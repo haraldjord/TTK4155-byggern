@@ -21,6 +21,8 @@ void OLED_clear_line(char page);
 void OLED_print_char(unsigned char msg);
 void OLED_print(char msg[], int length);
 void OLED_print_arrow(char page, char column);
+void OLED_print_heart_empty(void);
+void OLED_print_heart_full(void);
 
 void OLED_print_arrow(char page, char column) {
 	OLED_pos(page, column);
@@ -31,6 +33,36 @@ void OLED_print_arrow(char page, char column) {
 	OLED_send_data(0b01111110);
 	OLED_send_data(0b00111100);
 	OLED_send_data(0b00011000);
+	OLED_send_data(0b00000000);
+}
+
+void OLED_print_heart_empty(void) {
+	OLED_send_data(0b00000000);
+	OLED_send_data(0b00001110);
+	OLED_send_data(0b00010001);
+	OLED_send_data(0b00100001);
+	OLED_send_data(0b01000001);
+	OLED_send_data(0b10000010);
+	OLED_send_data(0b10000010);
+	OLED_send_data(0b01000001);
+	OLED_send_data(0b00100001);
+	OLED_send_data(0b00010001);
+	OLED_send_data(0b00001110);
+	OLED_send_data(0b00000000);
+}
+
+void OLED_print_heart_full(void) {
+	OLED_send_data(0b00000000);
+	OLED_send_data(0b00001110);
+	OLED_send_data(0b00011111);
+	OLED_send_data(0b00111111);
+	OLED_send_data(0b01111111);
+	OLED_send_data(0b11111110);
+	OLED_send_data(0b11111110);
+	OLED_send_data(0b01111111);
+	OLED_send_data(0b00111111);
+	OLED_send_data(0b00011111);
+	OLED_send_data(0b00001110);
 	OLED_send_data(0b00000000);
 }
 

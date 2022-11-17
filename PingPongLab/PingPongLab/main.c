@@ -39,6 +39,8 @@ void CLK_Init(int TOP);
 void SRAM_Init(void);
 void screen0(void);
 void screen1(void);
+void screen2(char hp, char max_hp);
+void screen3(void);
 
 static FILE uart_stdio = FDEV_SETUP_STREAM(
 	(int(*)(char, struct __file *))USART_Transmit, 
@@ -106,7 +108,13 @@ int main(void)
 	char screen = 0;
 	char prev_screen = 1;
 	
+	char game_status = 0;
+	char max_hp = 3;
+	char hp = 3;
+	char prev_hp = 3;
+	
 	OLED_reset();	
+	
 	
 	message msg, msg_received;
 	msg.ID = 42;
@@ -160,7 +168,7 @@ int main(void)
 			printf("Message sent\n");
 		}
 		*/
-
+		
 		if (new_message) {
 	
 			msg_received = CAN_receive();
@@ -172,6 +180,8 @@ int main(void)
 			char rx_status = MCP_read(MCP_RX_STATUS);
 			printf("EFLG: %X\n", EFLG);
 			printf("Status: %X, RX_status: %X\n", status, rx_status);
+			
+			hp = max_hp - msg_received.data[0];
 		}
 
 
@@ -205,24 +215,45 @@ int main(void)
 			}
 			if (screen == 1) {
 				screen1();
-				min_pos = 2;
+				min_pos = 6;
 				max_pos = 6;
 			}
+			if (screen == 2) {
+				hp = max_hp;
+				game_status = 1;
+				screen2(hp, max_hp);
+				min_pos = 6;
+				max_pos = 6;
+			}
+			else game_status = 0;
+			if (screen == 3) {
+				screen3();
+				min_pos = 2;
+				max_pos = 3;
+			}
+			
+			
 			arrow_pos = min_pos;
 			OLED_print_arrow(arrow_pos, 0);
 			prev_screen = screen;
 		} 
 		
+		if (screen == 2 && prev_hp != hp) {
+			screen2(hp, max_hp);
+			prev_hp = hp;
+		}
+		
 		
 		if (screen == 0 && joystick_button_pressed) {
 			if (arrow_pos == min_pos) {
-				printf("Button pressed\n");
+				screen = 2;
 			}
 			if (arrow_pos == min_pos + 1) {
 				screen = 1;
 			}
 		}
 		else if (screen == 1 && joystick_button_pressed) {
+			game_status = 2;
 
 			if (arrow_pos == max_pos) {
 				screen = 0;
@@ -231,6 +262,19 @@ int main(void)
 				printf("Option %d selected\n", arrow_pos-min_pos+1);
 			}
 		}
+		else if (screen == 2 && joystick_button_pressed) {
+			screen = 0;
+		}
+		else if (screen == 3 && joystick_button_pressed) {
+			if (arrow_pos == min_pos) {
+				screen = 2;
+			}
+			if (arrow_pos == min_pos + 1) {
+				screen = 0;
+			}
+		}
+		
+		if (screen == 2 && hp <= 0) screen = 3;
 		
 		
 		Read_ADC();
@@ -244,13 +288,16 @@ int main(void)
 		msg.data[3] = analog3;
 		msg.data[4] = button_left;
 		msg.data[5] = button_right;
-		msg.length = 6;
+		msg.data[6] = game_status;
+		msg.length = 7;
 		CAN_send(msg);
 		
+		/*
 		printf("ID: %d, length: %d, message: ", msg.ID, msg.length);
 		for (int i = 0; i < msg.length; i++)
 			printf("%d ", msg.data[i]);
 		printf("\n");
+		*/
 		
 		unsigned int direction = CENTER;
 		if      (x > 0 && abs(y) < abs(x)) direction = RIGHT; 
@@ -261,7 +308,6 @@ int main(void)
 		if (x*x + y*y < 80*80) direction = DEAD;
 		if (x*x + y*y < 60*60) direction = CENTER;
 		
-		 
 		 
 		if (direction == CENTER)
 			ready_to_move = 1;
@@ -293,7 +339,7 @@ int main(void)
 			}
 		}
 		
-		
+		printf("%d\n", x); // DO NOT REMOVE
 		
 		/*
 		if (received_char == 's') {
@@ -346,6 +392,9 @@ int main(void)
 
 
 
+/* Game Screens */
+
+// Main menu
 void screen0(void) {
 	OLED_reset();
 	OLED_pos(0, 10);
@@ -353,27 +402,77 @@ void screen0(void) {
 	OLED_pos(1, 10);
 	for (int i = 0; i < 9*8; i++) OLED_send_data(0b00000001);
 	OLED_pos(2, 10);
-	OLED_print("Print test", 10);
+	OLED_print("Play game", 9);
 	OLED_pos(3, 10);
-	OLED_print("Options", 7);
+	OLED_print("Calibration", 11);
 }
 
+// Calibration menu
 void screen1(void) {
 	OLED_reset();
 	OLED_pos(0, 10);
-	OLED_print("Options", 7);
+	OLED_print("Calibration", 11);
 	OLED_pos(1, 10);
-	for (int i = 0; i < 9*8; i++) OLED_send_data(0b00000001);
+	for (int i = 0; i < 11*8; i++) OLED_send_data(0b00000001);
+
+	OLED_pos(2, 10);
+	OLED_print("Put the sled", 12);
+	OLED_pos(3, 10);
+	OLED_print("in the center", 13);
+	OLED_pos(4, 10);
+	OLED_print("and exit.", 9);
 	
-	for (char i = 0; i < 4; i++) {
-		OLED_pos(i+2, 10);
-		OLED_print("Option ", 7);
-		OLED_print_char(49 + i);
+	OLED_pos(6, 10);
+	OLED_print("Return", 6);
+}
+
+// Game screen
+void screen2(char hp, char max_hp) {
+	OLED_reset();
+	OLED_pos(0, 10);
+	OLED_print("PingPong Mania", 14);
+	OLED_pos(1, 10);
+	for (int i = 0; i < 14*8; i++) OLED_send_data(0b00000001);
+	OLED_pos(2, 10);
+	OLED_print("HP:", 3);
+	
+	for (int i = 0; i < max_hp; i++) {
+		if (i < hp) OLED_print_heart_full();
+		else OLED_print_heart_empty(); 
 	}
 	
 	OLED_pos(6, 10);
 	OLED_print("Return", 6);
 }
+
+// Game over screen
+void screen3() {
+	OLED_reset();
+	OLED_pos(0, 10);
+	OLED_print("Game over", 9);
+	OLED_pos(1, 10);
+	for (int i = 0; i < 9*8; i++) OLED_send_data(0b00000001);
+	
+	OLED_pos(2, 10);
+	OLED_print("Play again", 10);
+	OLED_pos(3, 10);
+	OLED_print("Return", 6);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 void Calibrate_Joystick(void) {
 	offset_x = 0;
